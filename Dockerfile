@@ -9,9 +9,12 @@ RUN apt-get update && apt-get install -y \
     python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip so pyproject.toml packages install correctly on Ubuntu 22.04
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+
 # Install VibeVoice community fork (provides the vibevoice package)
 RUN git clone https://github.com/vibevoice-community/VibeVoice.git /vibevoice-src \
-    && pip3 install --no-cache-dir -e /vibevoice-src
+    && pip3 install --no-cache-dir /vibevoice-src
 
 # Install additional deps (runpod, huggingface-cli, etc.)
 COPY requirements.txt .
