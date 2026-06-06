@@ -3,7 +3,7 @@
 RunPod serverless GPU worker for [aoi-ot/VibeVoice-Large](https://huggingface.co/aoi-ot/VibeVoice-Large). Send a text prompt plus a reference audio clip; the worker clones that voice and returns synthesized speech at **24 kHz**.
 
 **Repository:** [Tr1dae/RunPod-VibeVoice](https://github.com/Tr1dae/RunPod-VibeVoice)  
-**Docker image:** `docker.io/qualitycontrolty/runpod-vibevoice:latest`
+**Docker image:** `docker.io/qualitycontrolty/runpod-vibevoice:cu121` (CUDA fix; also tagged `:latest`)
 
 ## What it does
 
@@ -30,7 +30,7 @@ Cold start loads the full model from local paths; no Hugging Face download at ru
 1. Create a **Serverless** endpoint.
 2. Set the container image to:
    ```
-   docker.io/qualitycontrolty/runpod-vibevoice:latest
+   docker.io/qualitycontrolty/runpod-vibevoice:cu121
    ```
 3. Optional environment variables (defaults shown):
 
@@ -132,7 +132,9 @@ For a minimal test clip without your own file, copy the `audio_b64` value from [
 Requires Docker, ~80+ GB free disk for build layers, and network access for the first build (downloads models).
 
 ```bash
-docker build --platform linux/amd64 -t qualitycontrolty/runpod-vibevoice:latest .
+docker build --platform linux/amd64 \
+  -t qualitycontrolty/runpod-vibevoice:cu121 \
+  -t qualitycontrolty/runpod-vibevoice:latest .
 ```
 
 The image embeds:
@@ -142,9 +144,19 @@ The image embeds:
 
 Subsequent rebuilds after changing only `handler.py` reuse cached model layers and are much faster.
 
+The Dockerfile installs **CUDA-enabled PyTorch** (`cu121`) before the VibeVoice package so pip does not pull CPU-only wheels. After deploy, worker logs should show:
+
+```text
+[VibeVoice] torch=2.x.x+cu121, cuda_available=True, cuda_devices=1
+[VibeVoice] Loading model from '/app/models/VibeVoice-Large' on cuda...
+```
+
+If you see `on cpu` instead, jobs will appear to hang (inference can take hours). Rebuild and redeploy the image, and force RunPod to pull the new `:latest` tag.
+
 Push to Docker Hub:
 
 ```bash
+docker push qualitycontrolty/runpod-vibevoice:cu121
 docker push qualitycontrolty/runpod-vibevoice:latest
 ```
 
