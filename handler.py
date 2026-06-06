@@ -26,8 +26,18 @@ SUPPORTED_LANGUAGES = {"en", "zh"}
 # --- Device ---
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dtype = torch.bfloat16 if device == "cuda" else torch.float32
+cuda_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
 
 # --- Load once at startup ---
+print(
+    f"[VibeVoice] torch={torch.__version__}, cuda_available={torch.cuda.is_available()}, "
+    f"cuda_devices={cuda_count}"
+)
+if device == "cpu":
+    print(
+        "[VibeVoice] WARNING: running on CPU — inference on VibeVoice-Large will be extremely slow. "
+        "Rebuild the image with CUDA-enabled PyTorch (see Dockerfile)."
+    )
 print(f"[VibeVoice] Loading model from '{MODEL_PATH}' on {device}...")
 processor = VibeVoiceProcessor.from_pretrained(MODEL_PATH)
 model = VibeVoiceForConditionalGenerationInference.from_pretrained(
@@ -146,6 +156,12 @@ def handler(job):
     if not isinstance(text, str) or not text.strip():
         return {"error": "Missing required 'text' (non-empty string)."}
 
+    print(
+        f"[VibeVoice] Job received: text_chars={len(text.strip())}, "
+        f"has_audio_b64={isinstance(audio_b64, str) and bool(audio_b64.strip())}, "
+        f"language={language}, device={device}"
+    )
+
     if not isinstance(audio_b64, str) or not audio_b64.strip():
         return {"error": "Missing required 'audio_b64' (base64-encoded reference audio)."}
 
@@ -160,6 +176,7 @@ def handler(job):
 
     try:
         voice_sample = _decode_voice_sample(audio_b64.strip())
+        print("[VibeVoice] Starting inference...")
         audio_out_b64 = synthesize_speech(
             text.strip(),
             voice_sample,
@@ -167,6 +184,7 @@ def handler(job):
             cfg_scale=cfg_scale,
             ddpm_steps=ddpm_steps,
         )
+        print("[VibeVoice] Inference complete.")
         return {
             "audio_base64": audio_out_b64,
             "sample_rate": SAMPLE_RATE,

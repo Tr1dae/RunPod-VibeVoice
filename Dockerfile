@@ -12,9 +12,17 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip so pyproject.toml packages install correctly on Ubuntu 22.04
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
+# CUDA PyTorch must be installed before vibevoice; otherwise pip pulls CPU-only wheels.
+# cu121 wheels run on CUDA 12.x hosts (12.2 base image). Reinstall after vibevoice too.
+RUN pip3 install --no-cache-dir torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu121
+
 # Install VibeVoice community fork (provides the vibevoice package)
 RUN git clone https://github.com/vibevoice-community/VibeVoice.git /vibevoice-src \
     && pip3 install --no-cache-dir /vibevoice-src
+
+RUN pip3 install --no-cache-dir torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu121
 
 # Install additional deps (runpod, huggingface-cli, etc.)
 COPY requirements.txt .
