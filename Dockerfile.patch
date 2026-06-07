@@ -1,0 +1,15 @@
+# Handler-only update: layers on top of the published base image.
+# Use this when only handler.py changed — build/push in seconds, not ~30+ minutes.
+#
+#   docker build -f Dockerfile.patch --platform linux/amd64 \
+#     -t qualitycontrolty/runpod-vibevoice:opus .
+#   docker push qualitycontrolty/runpod-vibevoice:opus
+#
+# Rebuild the full Dockerfile when deps, models, or CUDA torch setup change.
+
+ARG BASE_IMAGE=qualitycontrolty/runpod-vibevoice:cu121
+FROM ${BASE_IMAGE}
+
+COPY handler.py /app/handler.py
+
+CMD ["python3", "handler.py"]

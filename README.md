@@ -9,7 +9,7 @@ RunPod serverless GPU worker for [aoi-ot/VibeVoice-Large](https://huggingface.co
 
 - Loads **VibeVoice-Large** and the **Qwen2.5-7B** tokenizer from disk (baked into the image at build time).
 - Accepts a **base64-encoded reference audio** file (`audio_b64`) for voice cloning.
-- Returns **base64 WAV** output at 24 kHz.
+- Returns **base64-encoded speech** at 24 kHz (default **Opus** for smallest payload; also **MP3** or **WAV**).
 - Supports **English** and **Chinese** (`language`: `en` or `zh`).
 - Exposes inference tuning via `cfg_scale` and `ddpm_steps`.
 
@@ -56,7 +56,8 @@ POST a job with this shape:
     "language": "en",
     "speaker_label": "Speaker 0",
     "cfg_scale": 1.3,
-    "ddpm_steps": 5
+    "ddpm_steps": 5,
+    "output_format": "opus"
   }
 }
 ```
@@ -71,7 +72,9 @@ POST a job with this shape:
 | `speaker_label` | No | `Speaker 0` | Speaker prefix for single-speaker prompts. |
 | `cfg_scale` | No | `1.3` | CFG strength. Higher can sound more literal but less natural. |
 | `ddpm_steps` | No | `5` | Diffusion denoising steps. More steps = slower, often higher quality. |
-| `audio_mime` | No | — | Accepted for documentation; not used by the handler today. |
+| `output_format` | No | `opus` | Response encoding: `opus` (smallest, default), `mp3`, or `wav`. Aliases `ogg`/`oga` map to `opus`. |
+| `output_bitrate_kbps` | No | `24` (opus), `64` (mp3) | Encoder bitrate for lossy formats. Ignored for `wav`. |
+| `audio_mime` | No | — | Accepted for documentation on input reference clips; not used by the handler. |
 
 **Note:** Requests with only `text` and `language` (no `audio_b64`) return an error. Reference audio is required for this deployment.
 
@@ -81,8 +84,14 @@ POST a job with this shape:
 
 ```json
 {
-  "audio_base64": "<base64 WAV at 24 kHz>",
+  "audio_base64": "<base64-encoded audio>",
+  "audio_mime": "audio/opus",
+  "format": "opus",
+  "extension": "opus",
   "sample_rate": 24000,
+  "duration_seconds": 3.42,
+  "audio_bytes": 10240,
+  "bitrate_kbps": 24,
   "language": "en",
   "speaker_label": "Speaker 0",
   "cfg_scale": 1.3,
@@ -90,7 +99,7 @@ POST a job with this shape:
 }
 ```
 
-Decode `audio_base64` to bytes and save as a `.wav` file.
+Decode `audio_base64` to bytes and save with the matching extension (e.g. `.opus`, `.mp3`, `.wav`). Use `audio_mime` when serving over HTTP. Request `"output_format": "wav"` if you need uncompressed PCM.
 
 ### Validation error (job completes, error in body)
 
@@ -121,6 +130,7 @@ payload = {
         "language": "en",
         "cfg_scale": 1.3,
         "ddpm_steps": 5,
+        "output_format": "opus",
     }
 }
 ```
@@ -142,7 +152,25 @@ The image embeds:
 - `aoi-ot/VibeVoice-Large` → `/app/models/VibeVoice-Large`
 - `Qwen/Qwen2.5-7B` (tokenizer) → `/app/models/Qwen2.5-7B`
 
-Subsequent rebuilds after changing only `handler.py` reuse cached model layers and are much faster.
+Subsequent rebuilds after changing only `handler.py` reuse cached model layers and are much faster **only if Docker’s build cache is still intact**. Docker Desktop often evicts intermediate layer cache even when the final image (`cu121`) still exists locally — which triggers a full re-download of torch, vibevoice, and models.
+
+### Handler-only updates (recommended)
+
+When only `handler.py` changed, build on top of the published base image:
+
+```bash
+docker build -f Dockerfile.patch --platform linux/amd64 \
+  -t qualitycontrolty/runpod-vibevoice:opus \
+  -t qualitycontrolty/runpod-vibevoice:latest .
+docker push qualitycontrolty/runpod-vibevoice:opus
+docker push qualitycontrolty/runpod-vibevoice:latest
+```
+
+This takes seconds to build and pushes one small layer (~12 KB). Requires `qualitycontrolty/runpod-vibevoice:cu121` locally or pullable from Docker Hub.
+
+### Full rebuild
+
+Use the main `Dockerfile` when deps, models, or CUDA torch setup change:
 
 The Dockerfile installs **CUDA-enabled PyTorch** (`cu121`) before the VibeVoice package so pip does not pull CPU-only wheels. After deploy, worker logs should show:
 

@@ -1,6 +1,6 @@
 {
   "title": "VibeVoice",
-  "description": "Voice-cloning TTS powered by aoi-ot/VibeVoice-Large. Accepts a text prompt and a reference audio clip (base64) and returns synthesized speech at 24 kHz. Supports English and Chinese.",
+  "description": "Voice-cloning TTS powered by aoi-ot/VibeVoice-Large. Accepts a text prompt and a reference audio clip (base64) and returns synthesized speech at 24 kHz as Opus/MP3/WAV (Opus default). Supports English and Chinese.",
   "type": "serverless",
   "category": "audio",
   "iconUrl": "https://raw.githubusercontent.com/jords1755/VibeVoice/main/assets/icon.png",
@@ -14,7 +14,8 @@
           "MODEL_PATH": "/app/models/VibeVoice-Large",
           "CFG_SCALE": "1.3",
           "DDPM_STEPS": "5",
-          "SPEAKER_LABEL": "Speaker 0"
+          "SPEAKER_LABEL": "Speaker 0",
+          "OUTPUT_FORMAT": "opus"
         }
       }
     ],
@@ -48,6 +49,15 @@
           "type": "string",
           "description": "Default speaker prefix for single-speaker prompts (override per job via input.speaker_label)",
           "default": "Speaker 0"
+        }
+      },
+      {
+        "key": "OUTPUT_FORMAT",
+        "input": {
+          "name": "Default Output Format",
+          "type": "string",
+          "description": "Default response encoding: opus, mp3, or wav (override per job via input.output_format)",
+          "default": "opus"
         }
       }
     ]
